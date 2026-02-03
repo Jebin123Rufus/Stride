@@ -1,0 +1,13 @@
+project_id = "nixwxrduyjufalkalbjs"
+
+[functions.generate-learning-paths]
+verify_jwt = false
+
+[functions.generate-roadmap]
+verify_jwt = false
+
+[functions.generate-learning-content]
+verify_jwt = false
+
+[functions.parse-resume]
+verify_jwt = false
