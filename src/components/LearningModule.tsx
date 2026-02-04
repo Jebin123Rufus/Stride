@@ -257,28 +257,43 @@ export function LearningModule({
     setQuizSubmitted(false);
     
     try {
+      // We send a very specific prompt as the 'section' so that even old versions
+      // of the Edge Function (Mode 2) will return what we need.
       const { data, error } = await supabase.functions.invoke("generate-learning-content", {
         body: {
           skillName,
           subtopicTitle: subtopic.title,
-          section: "quiz",
+          section: "10-question MCQ quiz in JSON format with 'questions' array including question, options, correctAnswer index, and explanation",
         },
       });
 
       if (error) throw error;
-      console.log("📥 Stride AI: Quiz Response Data:", data);
+      console.log("📥 Stride AI: Quiz Raw Response:", data);
 
-      if (data) {
-        if (data.isError) {
-          throw new Error(data.message || data.error || "Quiz generation failed");
+      let quizData = data;
+      
+      // Handle the case where the function returns { content: "{...}" } (our Mode 2)
+      if (data && data.content) {
+        try {
+          // If the AI returned Markdown code blocks, strip them
+          const cleanedContent = data.content.includes("```json") 
+            ? data.content.split("```json")[1].split("```")[0].trim()
+            : data.content.includes("```") 
+              ? data.content.split("```")[1].split("```")[0].trim()
+              : data.content.trim();
+          
+          quizData = JSON.parse(cleanedContent);
+        } catch (e) {
+          console.error("❌ Stride AI: Failed to parse nested quiz content:", data.content);
         }
-        if (data.questions && data.questions.length > 0) {
-          setQuizQuestions(data.questions);
-          setUserAnswers(new Array(data.questions.length).fill(-1));
-        } else {
-          console.error("❌ Stride AI: Invalid quiz format. Questions missing or empty in:", data);
-          throw new Error("No questions were generated. Please try again.");
-        }
+      }
+
+      if (quizData && quizData.questions && quizData.questions.length > 0) {
+        setQuizQuestions(quizData.questions);
+        setUserAnswers(new Array(quizData.questions.length).fill(-1));
+      } else {
+        console.error("❌ Stride AI: Final quiz data is invalid:", quizData);
+        throw new Error("No questions were generated. Please try again.");
       }
     } catch (e: any) {
       console.error("Quiz generation error:", e);
