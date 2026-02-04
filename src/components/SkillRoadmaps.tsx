@@ -357,7 +357,6 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
                       exit={{ opacity: 0, height: 0 }}
                       className="border-t border-border"
                     >
-                      <ScrollArea className="max-h-96">
                         <div className="p-4 space-y-2">
                           {roadmap.topics.map((topic) => (
                             <div key={topic.id} className="rounded-lg border border-border">
@@ -419,7 +418,7 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
                             </div>
                           ))}
                         </div>
-                      </ScrollArea>
+
                     </motion.div>
                   )}
                 </Card>
