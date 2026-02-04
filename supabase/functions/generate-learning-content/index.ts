@@ -18,24 +18,56 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const systemPrompt = `You are an expert educator creating comprehensive learning content. Generate detailed, engaging educational content that includes:
+    const systemPrompt = `You are an expert educator creating comprehensive, in-depth learning content. Generate VERY detailed educational content (800-1200 words minimum) that includes:
 
-1. Clear explanations with examples
-2. Key concepts and definitions
-3. Practical exercises or code examples where relevant
-4. Best practices and common pitfalls
-5. Summary and key takeaways
-6. Quiz questions to test understanding
+1. **Introduction & Overview**
+   - What is this concept and why it matters
+   - Prerequisites and what you'll learn
 
-Format the content in Markdown with proper headings, code blocks, and lists. Make it engaging and practical.`;
+2. **Core Concepts & Theory**
+   - Detailed explanations with multiple examples
+   - Key terminology and definitions
+   - How it fits into the bigger picture
 
-    const userPrompt = `Create comprehensive learning content for:
+3. **Practical Implementation**
+   - Step-by-step code examples with explanations
+   - Multiple use cases and scenarios
+   - Real-world applications
+
+4. **Best Practices & Patterns**
+   - Industry-standard approaches
+   - Common pitfalls and how to avoid them
+   - Performance considerations
+
+5. **Hands-On Exercises**
+   - Practice exercises with clear instructions
+   - Challenge problems to test understanding
+   - Project ideas to build
+
+6. **Summary & Key Takeaways**
+   - Main points to remember
+   - Quick reference guide
+   - Next steps for further learning
+
+7. **Quiz Questions**
+   - 3-5 questions to test understanding
+   - Mix of conceptual and practical questions
+
+Format the content in Markdown with proper headings (##, ###), code blocks with language specification, bullet points, and numbered lists. Make it comprehensive enough to serve as standalone documentation.`;
+
+    const userPrompt = `Create comprehensive, detailed learning content (minimum 800-1200 words) for:
 Skill: ${skillName}
 Topic: ${topicTitle}
 Subtopic: ${subtopicTitle}
 Target Career: ${dreamJob}
 
-Make the content practical and job-ready focused. Include real-world examples and exercises.`;
+Make the content practical and job-ready focused. Include:
+- Multiple real-world examples
+- Detailed code samples with line-by-line explanations
+- Common interview questions related to this topic
+- Tips for applying this knowledge in a ${dreamJob} role
+
+DO NOT include any time estimates or duration information. Focus purely on the educational content.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

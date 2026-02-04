@@ -24,15 +24,28 @@ Each topic should include:
 - id: A unique identifier (e.g., "topic-1")
 - title: Clear topic name
 - description: Brief explanation of what will be learned
-- estimatedHours: Time to complete
-- subtopics: Array of subtopics with similar structure plus a "content" field with detailed learning content
+- subtopics: Array of subtopics with detailed learning content
 
-Make the content practical and actionable with examples, exercises, and real-world applications.`;
+Each subtopic should have:
+- id: A unique identifier (e.g., "subtopic-1-1")
+- title: Clear subtopic name
+- description: Comprehensive description of what will be covered (at least 2-3 sentences)
+- content: VERY detailed learning content with examples, code snippets, exercises, and real-world applications. This should be comprehensive documentation (at least 500-800 words per subtopic) formatted in Markdown with:
+  * Clear explanations of concepts
+  * Multiple code examples with explanations
+  * Best practices and common pitfalls
+  * Practical exercises
+  * Real-world use cases
+  * Tips and tricks
+
+Make the content practical, actionable, and comprehensive enough to serve as standalone learning material.`;
 
     const userPrompt = `Create a detailed learning roadmap for: ${skillName}
 Target Job: ${dreamJob}
 
-The roadmap should include 4-6 main topics, each with 3-5 subtopics. Make it comprehensive enough to take someone from beginner to job-ready for this skill.`;
+The roadmap should include 4-6 main topics, each with 3-5 subtopics. Make it comprehensive enough to take someone from beginner to job-ready for this skill.
+
+IMPORTANT: Each subtopic's content should be very detailed (500-800 words minimum) with thorough explanations, multiple code examples, and practical exercises. Do NOT include any time estimates or duration information.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -56,7 +69,6 @@ The roadmap should include 4-6 main topics, each with 3-5 subtopics. Make it com
                 type: "object",
                 properties: {
                   skillName: { type: "string" },
-                  totalEstimatedHours: { type: "number" },
                   topics: {
                     type: "array",
                     items: {
@@ -65,7 +77,6 @@ The roadmap should include 4-6 main topics, each with 3-5 subtopics. Make it com
                         id: { type: "string" },
                         title: { type: "string" },
                         description: { type: "string" },
-                        estimatedHours: { type: "number" },
                         subtopics: {
                           type: "array",
                           items: {
@@ -74,18 +85,17 @@ The roadmap should include 4-6 main topics, each with 3-5 subtopics. Make it com
                               id: { type: "string" },
                               title: { type: "string" },
                               description: { type: "string" },
-                              estimatedMinutes: { type: "number" },
                               content: { type: "string" }
                             },
-                            required: ["id", "title", "description", "estimatedMinutes", "content"]
+                            required: ["id", "title", "description", "content"]
                           }
                         }
                       },
-                      required: ["id", "title", "description", "estimatedHours", "subtopics"]
+                      required: ["id", "title", "description", "subtopics"]
                     }
                   }
                 },
-                required: ["skillName", "totalEstimatedHours", "topics"]
+                required: ["skillName", "topics"]
               }
             }
           }
