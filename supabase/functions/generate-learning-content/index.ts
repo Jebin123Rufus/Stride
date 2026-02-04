@@ -54,18 +54,18 @@ serve(async (req) => {
       const systemPrompt = `You are a technical examiner. Create a 10-question multiple-choice quiz about the given topic.
       Each question must have:
       1. A clear question text.
-      2. 4 distinct options.
-      3. Exactly 1 correct answer (as index 0-3).
-      4. A brief explanation for the correct answer.
-
-      Respond STRICTLY in JSON format:
+      2. 4 options (strings).
+      3. correctAnswer (integer index 0-3).
+      4. explanation (detailed string).
+      
+      Respond only with JSON:
       {
         "questions": [
           {
-            "question": "Question text?",
-            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "question": "...",
+            "options": ["...", "...", "...", "..."],
             "correctAnswer": 0,
-            "explanation": "Explanation here..."
+            "explanation": "..."
           }
         ]
       }`;
@@ -77,11 +77,13 @@ serve(async (req) => {
           model: model,
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: `Generate a 10-question quiz for - Skill: ${skillName} | Lesson: ${subtopicTitle}` }
+            { role: "user", content: `Skill: ${skillName} | Topic: ${subtopicTitle}` }
           ],
-          response_format: { type: "json_object" }
+          response_format: { type: "json_object" },
+          max_tokens: 3000
         }),
       });
+
 
       const data = await response.json();
       return new Response(data.choices[0].message.content, {
