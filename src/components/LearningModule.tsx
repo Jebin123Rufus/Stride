@@ -10,7 +10,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Loader2,
   BookOpen,
   CheckCircle2,
@@ -68,6 +67,7 @@ export function LearningModule({
   const [isLoading, setIsLoading] = useState(!subtopic.content);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
+  const [completedSubtopics, setCompletedSubtopics] = useState<Set<string>>(new Set());
   
   const { user, signOut } = useAuthContext();
   const { toast } = useToast();
@@ -81,9 +81,29 @@ export function LearningModule({
   useEffect(() => {
     if (!subtopic.content) {
       generateContent();
+    } else {
+      setContent(subtopic.content);
     }
     checkCompletion();
+    fetchAllCompletedSubtopics();
   }, [subtopic.id]);
+
+  const fetchAllCompletedSubtopics = async () => {
+    if (!user || !roadmap.id) return;
+
+    const { data } = await supabase
+      .from("topic_progress")
+      .select("subtopic_id")
+      .eq("user_id", user.id)
+      .eq("roadmap_id", roadmap.id)
+      .eq("topic_id", topic.id)
+      .eq("is_completed", true);
+
+    if (data) {
+      const completed = new Set(data.map(d => d.subtopic_id).filter(Boolean) as string[]);
+      setCompletedSubtopics(completed);
+    }
+  };
 
   const generateContent = async () => {
     setIsLoading(true);
@@ -134,21 +154,48 @@ export function LearningModule({
     setIsMarkingComplete(true);
 
     try {
-      const { error } = await supabase
+      // Check if record exists
+      const { data: existing } = await supabase
         .from("topic_progress")
-        .upsert({
-          user_id: user.id,
-          roadmap_id: roadmap.id,
-          topic_id: topic.id,
-          subtopic_id: subtopic.id,
-          is_completed: true,
-          completion_percentage: 100,
-          completed_at: new Date().toISOString(),
-        });
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("roadmap_id", roadmap.id)
+        .eq("topic_id", topic.id)
+        .eq("subtopic_id", subtopic.id)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (existing) {
+        // Update existing record
+        const { error } = await supabase
+          .from("topic_progress")
+          .update({
+            is_completed: true,
+            completion_percentage: 100,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+
+        if (error) throw error;
+      } else {
+        // Insert new record
+        const { error } = await supabase
+          .from("topic_progress")
+          .insert({
+            user_id: user.id,
+            roadmap_id: roadmap.id,
+            topic_id: topic.id,
+            subtopic_id: subtopic.id,
+            is_completed: true,
+            completion_percentage: 100,
+            completed_at: new Date().toISOString(),
+          });
+
+        if (error) throw error;
+      }
 
       setIsCompleted(true);
+      setCompletedSubtopics(prev => new Set(prev).add(subtopic.id));
+      
       toast({
         title: "Module completed!",
         description: "Great job! Keep up the learning momentum.",
@@ -165,9 +212,11 @@ export function LearningModule({
     }
   };
 
-  // Calculate topic progress
-  const completedSubtopics = topic.subtopics.filter((s, i) => i <= currentIndex).length;
-  const topicProgress = (completedSubtopics / topic.subtopics.length) * 100;
+  // Calculate topic progress based on completed subtopics
+  const completedCount = topic.subtopics.filter(s => 
+    completedSubtopics.has(s.id) || (s.id === subtopic.id && isCompleted)
+  ).length;
+  const topicProgress = (completedCount / topic.subtopics.length) * 100;
 
   return (
     <div className="min-h-screen bg-background">
@@ -224,10 +273,6 @@ export function LearningModule({
           <Card className="p-8">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <Badge variant="secondary" className="mb-2">
-                  <Clock className="w-3 h-3 mr-1" />
-                  {subtopic.estimatedMinutes} min
-                </Badge>
                 <h1 className="text-3xl font-bold">{subtopic.title}</h1>
                 <p className="text-muted-foreground mt-2">{subtopic.description}</p>
               </div>

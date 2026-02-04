@@ -10,7 +10,6 @@ import {
   ArrowLeft,
   ChevronRight,
   ChevronDown,
-  Clock,
   Check,
   Circle,
   BookOpen,
@@ -73,6 +72,7 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
   const [expandedSkill, setExpandedSkill] = useState<string | null>(null);
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<Map<string, number>>(new Map());
+  const [completedSubtopics, setCompletedSubtopics] = useState<Set<string>>(new Set());
   const [profile, setProfile] = useState<any>(null);
   
   const { user, signOut } = useAuthContext();
@@ -127,12 +127,17 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
       .eq("user_id", user.id);
 
     if (data) {
-      // Calculate progress per skill
+      // Track completed subtopics
+      const completed = new Set<string>();
       const progressMap = new Map<string, number>();
       const skillSubtopics = new Map<string, { total: number; completed: number }>();
 
       data.forEach((p: any) => {
         const skillName = p.skill_roadmaps.skill_name;
+        if (p.is_completed && p.subtopic_id) {
+          completed.add(`${skillName}-${p.topic_id}-${p.subtopic_id}`);
+        }
+        
         if (!skillSubtopics.has(skillName)) {
           skillSubtopics.set(skillName, { total: 0, completed: 0 });
         }
@@ -145,6 +150,7 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
         progressMap.set(key, Math.round((value.completed / value.total) * 100));
       });
 
+      setCompletedSubtopics(completed);
       setProgress(progressMap);
     }
   };
@@ -230,6 +236,10 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
     }
   };
 
+  const isSubtopicCompleted = (skillName: string, topicId: string, subtopicId: string) => {
+    return completedSubtopics.has(`${skillName}-${topicId}-${subtopicId}`);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -298,11 +308,9 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
                         <div>
                           <h3 className="font-semibold">{skill.name}</h3>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="w-3 h-3" />
-                            <span>{skill.estimatedHours}h estimated</span>
                             <Badge
                               variant="outline"
-                              className={`ml-2 ${getPriorityColor(skill.priority)}`}
+                              className={`${getPriorityColor(skill.priority)}`}
                             >
                               {skill.priority} priority
                             </Badge>
@@ -359,7 +367,7 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
                                   <div>
                                     <h4 className="font-medium">{topic.title}</h4>
                                     <p className="text-xs text-muted-foreground">
-                                      {topic.estimatedHours}h • {topic.subtopics.length} lessons
+                                      {topic.subtopics.length} lessons
                                     </p>
                                   </div>
                                 </div>
@@ -372,26 +380,30 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
 
                               {expandedTopics.has(topic.id) && (
                                 <div className="border-t border-border bg-muted/20 p-2 space-y-1">
-                                  {topic.subtopics.map((subtopic) => (
-                                    <div
-                                      key={subtopic.id}
-                                      className="flex items-center justify-between p-2 rounded hover:bg-background cursor-pointer transition-colors"
-                                      onClick={() =>
-                                        onOpenLearning(skill.name, topic, subtopic, roadmap)
-                                      }
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <Circle className="w-3 h-3 text-muted-foreground" />
-                                        <span className="text-sm">{subtopic.title}</span>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground">
-                                          {subtopic.estimatedMinutes}min
-                                        </span>
+                                  {topic.subtopics.map((subtopic) => {
+                                    const isCompleted = isSubtopicCompleted(skill.name, topic.id, subtopic.id);
+                                    return (
+                                      <div
+                                        key={subtopic.id}
+                                        className="flex items-center justify-between p-2 rounded hover:bg-background cursor-pointer transition-colors"
+                                        onClick={() =>
+                                          onOpenLearning(skill.name, topic, subtopic, roadmap)
+                                        }
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          {isCompleted ? (
+                                            <Check className="w-3 h-3 text-success" />
+                                          ) : (
+                                            <Circle className="w-3 h-3 text-muted-foreground" />
+                                          )}
+                                          <span className={`text-sm ${isCompleted ? "text-muted-foreground line-through" : ""}`}>
+                                            {subtopic.title}
+                                          </span>
+                                        </div>
                                         <ChevronRight className="w-4 h-4 text-muted-foreground" />
                                       </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
