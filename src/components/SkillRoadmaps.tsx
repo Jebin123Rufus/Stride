@@ -193,11 +193,11 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
         title: "Roadmap generated!",
         description: `Your learning roadmap for ${skillName} is ready.`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating roadmap:", error);
       toast({
         title: "Error generating roadmap",
-        description: "Please try again later.",
+        description: error.message || "Please try again later.",
         variant: "destructive",
       });
     } finally {
@@ -233,19 +233,23 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10 h-20 flex items-center">
+        <div className="container mx-auto px-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={onBack}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-primary-foreground" />
+            <div className="flex items-center group relative">
+              <div className="relative w-12 h-12 flex items-center justify-center">
+                <img 
+                  src="/logo.png" 
+                  alt="Stride Logo" 
+                  className="absolute h-24 w-auto max-w-[200%] object-contain" 
+                />
               </div>
-              <div>
-                <span className="text-lg font-bold">SkillPath Pro</span>
-                <p className="text-xs text-muted-foreground">{selectedPath.title}</p>
+              <div className="flex flex-col ml-4">
+                <span className="text-3xl font-black italic tracking-tighter text-primary drop-shadow-sm leading-tight">STRIDE</span>
+                <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-muted-foreground/60 leading-none -mt-0.5 ml-1">{selectedPath.title}</p>
               </div>
             </div>
           </div>
@@ -298,11 +302,9 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
                         <div>
                           <h3 className="font-semibold">{skill.name}</h3>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="w-3 h-3" />
-                            <span>{skill.estimatedHours}h estimated</span>
                             <Badge
                               variant="outline"
-                              className={`ml-2 ${getPriorityColor(skill.priority)}`}
+                              className={`ml-0 ${getPriorityColor(skill.priority)}`}
                             >
                               {skill.priority} priority
                             </Badge>
@@ -359,7 +361,7 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
                                   <div>
                                     <h4 className="font-medium">{topic.title}</h4>
                                     <p className="text-xs text-muted-foreground">
-                                      {topic.estimatedHours}h • {topic.subtopics.length} lessons
+                                      {topic.subtopics.length} lessons
                                     </p>
                                   </div>
                                 </div>
@@ -385,9 +387,6 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
                                         <span className="text-sm">{subtopic.title}</span>
                                       </div>
                                       <div className="flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground">
-                                          {subtopic.estimatedMinutes}min
-                                        </span>
                                         <ChevronRight className="w-4 h-4 text-muted-foreground" />
                                       </div>
                                     </div>

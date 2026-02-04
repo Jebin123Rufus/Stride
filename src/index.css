@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* SkillPath Pro Design System - Career Learning Platform
+/* Stride Design System - Career Learning Platform
    Aesthetic: Modern EdTech with gradient accents, clean cards, visual progress tracking
    Inspiration: LinkedIn Learning, Coursera, Roadmap.sh
 */
@@ -19,23 +19,23 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* Primary - Vibrant Indigo */
-    --primary: 239 84% 67%;
+    /* Primary - Vibrant Stride Blue */
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Soft lavender */
-    --secondary: 240 50% 96%;
-    --secondary-foreground: 239 84% 50%;
+    /* Secondary - Light Stride Blue */
+    --secondary: 217 100% 97%;
+    --secondary-foreground: 217 91% 40%;
 
-    /* Muted - Subtle grays */
+    /* ... existing muted ... */
     --muted: 220 14% 96%;
     --muted-foreground: 220 9% 46%;
 
-    /* Accent - Cyan/Teal for progress */
-    --accent: 172 66% 50%;
+    /* Accent - Cyan highlight */
+    --accent: 199 89% 48%;
     --accent-foreground: 0 0% 100%;
 
-    /* Success - For completed items */
+    /* ... other colors ... */
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
 
@@ -48,15 +48,15 @@
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 239 84% 67%;
+    --ring: 217 91% 60%;
 
     --radius: 0.75rem;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(239 84% 67%) 0%, hsl(280 70% 60%) 50%, hsl(330 80% 65%) 100%);
-    --gradient-secondary: linear-gradient(135deg, hsl(172 66% 50%) 0%, hsl(200 80% 55%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(217 91% 40%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(199 89% 48%) 0%, hsl(217 91% 60%) 100%);
     --gradient-warm: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(15 85% 60%) 100%);
-    --gradient-hero: linear-gradient(135deg, hsl(239 84% 67%) 0%, hsl(172 66% 50%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(199 89% 48%) 100%);
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 20% 98%) 100%);
     --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%);
 

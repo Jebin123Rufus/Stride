@@ -17,6 +17,7 @@ import {
   ChevronRight,
   LogOut,
   BookOpen,
+  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContext";
@@ -80,31 +81,72 @@ export function Dashboard({ onSelectPath }: DashboardProps) {
         .eq("user_id", user.id);
 
       if (pathsData && pathsData.length > 0) {
-        const formattedPaths = pathsData.map((p) => ({
-          id: p.id,
-          type: p.path_type,
-          title: p.title,
-          description: p.description || "",
-          skills: (p.skills as any) || [],
-          estimatedDuration: p.estimated_duration || "",
-          marketDemand: "high",
-          salaryImpact: "",
-          is_selected: p.is_selected,
-        }));
+        const pathOrder = ["easier", "recommended", "professional"];
+        const formattedPaths = pathsData
+          .map((p) => ({
+            id: p.id,
+            type: p.path_type,
+            title: p.title,
+            description: p.description || "",
+            skills: (p.skills as any) || [],
+            estimatedDuration: p.estimated_duration || "",
+            marketDemand: "high",
+            salaryImpact: "",
+            is_selected: p.is_selected,
+          }))
+          .sort((a, b) => pathOrder.indexOf(a.type) - pathOrder.indexOf(b.type));
+        
         setPaths(formattedPaths);
         
-        const selected = formattedPaths.find((p) => p.is_selected);
+        // Find if any is already selected in DB
+        let selected = formattedPaths.find((p) => p.is_selected);
+        
+        // If none is selected in DB (first time load), default to recommended
+        if (!selected) {
+          selected = formattedPaths.find(p => p.type === 'recommended') || formattedPaths[0];
+        }
+        
         if (selected) {
           setSelectedPath(selected);
         }
+        
+        console.log("Loaded paths from DB:", pathsData.length);
       } else {
         // Generate new paths
+        console.log("Generating fresh AI paths...");
         await generatePaths(profileData);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleReset = async (isFullWipe = false) => {
+    const msg = isFullWipe 
+      ? "This will delete ALL your progress, skills, and roadmaps. Continue?" 
+      : "This will delete your current paths so you can choose a new Goal/Skills. Continue?";
+    
+    if (!confirm(msg)) return;
+    
+    try {
+      // Always delete paths and roadmaps
+      await supabase.from('learning_paths').delete().eq('user_id', user!.id);
+      await supabase.from('skill_roadmaps').delete().eq('user_id', user!.id);
+      await supabase.from('topic_progress').delete().eq('user_id', user!.id);
+      
+      if (isFullWipe) {
+        await supabase.from('user_skills').delete().eq('user_id', user!.id);
+        await supabase.from('profiles').delete().eq('user_id', user!.id);
+      } else {
+        // Reset onboarding flag so they go back to Step 1/2/3
+        await supabase.from('profiles').update({ onboarding_completed: false }).eq('user_id', user!.id);
+      }
+      
+      window.location.reload();
+    } catch (e: any) {
+      toast({ title: "Reset failed", description: e.message, variant: "destructive" });
     }
   };
 
@@ -126,10 +168,15 @@ export function Dashboard({ onSelectPath }: DashboardProps) {
         body: {
           dreamJob: profileData.dream_job,
           currentSkills,
+          mock: false, // Set to true for quick debug
         },
       });
 
       if (response.error) throw response.error;
+      if (!response.data || !response.data.paths) {
+        console.error("Malformed response or API Error:", JSON.stringify(response.data, null, 2));
+        throw new Error("AI returned an invalid response format. Please try again.");
+      }
 
       const generatedPaths = response.data.paths;
 
@@ -150,23 +197,45 @@ export function Dashboard({ onSelectPath }: DashboardProps) {
 
       if (insertError) throw insertError;
 
-      const formattedPaths = insertedPaths.map((p: any) => ({
-        id: p.id,
-        type: p.path_type,
-        title: p.title,
-        description: p.description || "",
-        skills: p.skills || [],
-        estimatedDuration: p.estimated_duration || "",
-        marketDemand: generatedPaths.find((gp: any) => gp.type === p.path_type)?.marketDemand || "high",
-        salaryImpact: generatedPaths.find((gp: any) => gp.type === p.path_type)?.salaryImpact || "",
-      }));
+      const pathOrder = ["easier", "recommended", "professional"];
+      const formattedPaths = insertedPaths
+        .map((p: any) => ({
+          id: p.id,
+          type: p.path_type,
+          title: p.title,
+          description: p.description || "",
+          skills: p.skills || [],
+          estimatedDuration: p.estimated_duration || "",
+          marketDemand: generatedPaths.find((gp: any) => gp.type === p.path_type)?.marketDemand || "high",
+          salaryImpact: generatedPaths.find((gp: any) => gp.type === p.path_type)?.salaryImpact || "",
+        }))
+        .sort((a, b) => pathOrder.indexOf(a.type) - pathOrder.indexOf(b.type));
 
       setPaths(formattedPaths);
-    } catch (error) {
+      
+      // Auto-select recommended path immediately after generation
+      const recommended = formattedPaths.find(p => p.type === 'recommended') || formattedPaths[0];
+      if (recommended) {
+        setSelectedPath(recommended);
+      }
+    } catch (error: any) {
       console.error("Error generating paths:", error);
+      
+      // Try to get more detailed info from the error object
+      const context = error?.context;
+      if (context) {
+        console.log("Error Context:", context);
+        try {
+          const body = await context.json();
+          console.log("Error JSON body:", body);
+        } catch (e) {
+          // Body might not be JSON
+        }
+      }
+
       toast({
         title: "Error generating paths",
-        description: "Please try again later.",
+        description: error.message || "Please try again later.",
         variant: "destructive",
       });
     } finally {
@@ -242,22 +311,60 @@ export function Dashboard({ onSelectPath }: DashboardProps) {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-primary-foreground" />
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10 h-20 flex items-center">
+        <div className="container mx-auto px-4 flex items-center justify-between">
+          <div className="flex items-center group cursor-pointer relative">
+            <div className="relative w-16 h-16 flex items-center justify-center">
+              <img 
+                src="/logo.png" 
+                alt="Stride Logo" 
+                className="absolute h-32 w-auto max-w-[200%] object-contain transition-transform group-hover:scale-105" 
+              />
             </div>
-            <span className="text-xl font-bold">SkillPath Pro</span>
+            <span className="text-4xl md:text-5xl font-black italic tracking-tighter text-primary drop-shadow-md leading-none ml-6">
+              STRIDE
+            </span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm font-medium text-muted-foreground hidden xl:inline">
               Welcome, {profile?.full_name || "Learner"}
             </span>
-            <Button variant="ghost" size="sm" onClick={signOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
+            
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleReset(false)}
+                className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary transition-colors"
+                title="Choose a new career goal or update your skills"
+              >
+                <Target className="w-4 h-4" />
+                Change Goal
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => handleReset(true)}
+                className="text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors gap-2"
+                title="Wipe all data and start completely fresh"
+              >
+                <X className="w-4 h-4" />
+                <span className="hidden sm:inline">Wipe Data</span>
+              </Button>
+
+              <div className="h-4 w-[1px] bg-border mx-1" />
+
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={signOut}
+                className="gap-2 text-muted-foreground hover:text-foreground"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -333,15 +440,9 @@ export function Dashboard({ onSelectPath }: DashboardProps) {
                   <p className="text-muted-foreground text-sm mb-4">{path.description}</p>
 
                   {/* Stats */}
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span>{path.estimatedDuration}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                      <span>{path.marketDemand} demand</span>
-                    </div>
+                  <div className="flex items-center gap-2 text-sm mb-4">
+                    <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                    <span>{path.marketDemand} demand</span>
                   </div>
 
                   {/* Skills preview */}

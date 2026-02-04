@@ -6,131 +6,101 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders, status: 200 });
+  }
+
+  // Handle direct browser check
+  if (req.method === "GET") {
+    return new Response(JSON.stringify({ status: "Function is alive and reachable!" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {
-    const { dreamJob, currentSkills, resumeSkills } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const body = await req.json();
+    const { dreamJob, currentSkills, resumeSkills } = body;
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
 
     const allSkills = [...new Set([...(currentSkills || []), ...(resumeSkills || [])])];
     
-    const systemPrompt = `You are an expert career counselor and learning path designer. Your task is to analyze a user's dream job, their current skills, and market trends to create personalized learning paths.
-
-Always respond with valid JSON containing exactly 3 learning paths:
-1. "recommended" - The most balanced and personalized path based on their current skills and the job requirements
-2. "easier" - A more accessible path with lower difficulty but still effective  
-3. "professional" - The most comprehensive, industry-leading path with high-demand premium skills
-
-Each path should include:
-- title: A compelling name for the path
-- description: 2-3 sentences explaining the path
-- skills: An array of 4-8 skill objects with { name, priority (high/medium/low), estimatedHours }
-- estimatedDuration: Total time estimate (e.g., "3-4 months")
-- marketDemand: (high/medium) 
-- salaryImpact: Potential salary increase percentage`;
-
-    const userPrompt = `Dream Job: ${dreamJob}
-Current Skills: ${allSkills.length > 0 ? allSkills.join(", ") : "None specified"}
-
-Please analyze the skill gap and create 3 distinct learning paths to help achieve this career goal. Consider current market trends and in-demand skills for this role in 2024-2025.`;
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "generate_learning_paths",
-              description: "Generate 3 personalized learning paths",
-              parameters: {
-                type: "object",
-                properties: {
-                  paths: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        type: { type: "string", enum: ["recommended", "easier", "professional"] },
-                        title: { type: "string" },
-                        description: { type: "string" },
-                        skills: {
-                          type: "array",
-                          items: {
-                            type: "object",
-                            properties: {
-                              name: { type: "string" },
-                              priority: { type: "string", enum: ["high", "medium", "low"] },
-                              estimatedHours: { type: "number" }
-                            },
-                            required: ["name", "priority", "estimatedHours"]
-                          }
-                        },
-                        estimatedDuration: { type: "string" },
-                        marketDemand: { type: "string", enum: ["high", "medium"] },
-                        salaryImpact: { type: "string" }
-                      },
-                      required: ["type", "title", "description", "skills", "estimatedDuration", "marketDemand", "salaryImpact"]
-                    }
-                  }
-                },
-                required: ["paths"]
-              }
-            }
-          }
-        ],
-        tool_choice: { type: "function", function: { name: "generate_learning_paths" } }
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error("Failed to generate learning paths");
-    }
-
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    const systemPrompt = `You are an elite career strategist. Analyze the user's dream job and current skills to create 3 **vast and comprehensive** learning paths.
     
-    if (!toolCall) {
-      throw new Error("No tool call response received");
+    For each path:
+    - **Description**: Must be detailed, explaining the "why" and "how" based on **current 2024-2025 market trends**.
+    - **Skills**: Include **at least 8** high-impact, high-paying skills in demand for this specific path.
+    
+    Respond ONLY with a JSON object in this format:
+    {
+      "paths": [
+        {
+          "type": "recommended" | "easier" | "professional",
+          "title": "string",
+          "description": "A vast, detailed description of this career path, analyzing market demand and key opportunities.",
+          "skills": [{ "name": "string", "priority": "high"|"medium"|"low" }],
+          "marketDemand": "Analysis",
+          "salaryImpact": "Range"
+        }
+      ]
+    }`;
+
+    const userPrompt = `Dream Job: ${dreamJob}\nCurrent Skills: ${allSkills.length > 0 ? allSkills.join(", ") : "None specified"}
+    
+    REQUIREMENT: Generate extensive, high-value paths based on current top-tier market demands.`;
+
+    try {
+      console.log("Calling Groq API (llama-3.3-70b)...");
+      const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+      
+      if (!GROQ_API_KEY) {
+        throw new Error("GROQ_API_KEY is not configured");
+      }
+ 
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          response_format: { type: "json_object" }
+        }),
+      });
+ 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Groq API Error:", response.status, errorText);
+        throw new Error(`Groq API Error: ${response.status}`);
+      }
+ 
+      const data = await response.json();
+      const text = data.choices[0].message.content;
+      
+      if (!text) throw new Error("No response text from Groq");
+ 
+      return new Response(text, {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+ 
+    } catch (apiError: any) {
+      console.error("Error generating paths:", apiError);
+      return new Response(JSON.stringify({ 
+        error: "Groq API Call Failed", 
+        details: apiError.message 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-
-    const paths = JSON.parse(toolCall.function.arguments);
-
-    return new Response(JSON.stringify(paths), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("Error generating learning paths:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+  } catch (error: any) {
+    console.error("Critical server error:", error);
+    return new Response(JSON.stringify({ error: "Internal Server Error", message: error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

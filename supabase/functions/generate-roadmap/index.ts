@@ -12,121 +12,91 @@ serve(async (req) => {
 
   try {
     const { skillName, dreamJob } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+    const systemPrompt = `You are an elite career strategist and master curriculum architect. Create an **extremely vast, exhaustive, and deep-dive** learning roadmap for a specific skill.
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
-    const systemPrompt = `You are an expert curriculum designer. Create a comprehensive learning roadmap for a specific skill. The roadmap should be structured with topics and subtopics that progressively build knowledge from beginner to advanced.
-
-Each topic should include:
-- id: A unique identifier (e.g., "topic-1")
-- title: Clear topic name
-- description: Brief explanation of what will be learned
-- estimatedHours: Time to complete
-- subtopics: Array of subtopics with similar structure plus a "content" field with detailed learning content
-
-Make the content practical and actionable with examples, exercises, and real-world applications.`;
-
-    const userPrompt = `Create a detailed learning roadmap for: ${skillName}
-Target Job: ${dreamJob}
-
-The roadmap should include 4-6 main topics, each with 3-5 subtopics. Make it comprehensive enough to take someone from beginner to job-ready for this skill.`;
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "generate_roadmap",
-              description: "Generate a skill learning roadmap",
-              parameters: {
-                type: "object",
-                properties: {
-                  skillName: { type: "string" },
-                  totalEstimatedHours: { type: "number" },
-                  topics: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        id: { type: "string" },
-                        title: { type: "string" },
-                        description: { type: "string" },
-                        estimatedHours: { type: "number" },
-                        subtopics: {
-                          type: "array",
-                          items: {
-                            type: "object",
-                            properties: {
-                              id: { type: "string" },
-                              title: { type: "string" },
-                              description: { type: "string" },
-                              estimatedMinutes: { type: "number" },
-                              content: { type: "string" }
-                            },
-                            required: ["id", "title", "description", "estimatedMinutes", "content"]
-                          }
-                        }
-                      },
-                      required: ["id", "title", "description", "estimatedHours", "subtopics"]
-                    }
-                  }
-                },
-                required: ["skillName", "totalEstimatedHours", "topics"]
-              }
+    CRITICAL INSTRUCTIONS:
+    1.  **Exhaustive Depth**: The roadmap must include **at least 10-12 major topics**. Each major topic must contain **4-6 detailed subtopics**.
+    2.  **Total Coverage**: Cover everything from absolute foundations to niche, industry-standard expert topics, advanced patterns, and latest 2024-2025 ecosystem tools.
+    3.  **Market-Driven**: Focus on concepts, frameworks, and tools currently required by top-tier tech giants (FAANG+, top startups).
+    4.  **No Time Estimates**: Do NOT include any estimated hours/minutes.
+    
+    Respond STRICTLY with a valid JSON in this format:
+    {
+      "skillName": "The Skill",
+      "topics": [
+        {
+          "id": "topic-1",
+          "title": "Topic Name",
+          "description": "Vast explanation of this module's professional relevance.",
+          "subtopics": [
+            {
+              "id": "subtopic-1-1",
+              "title": "Subtopic Name",
+              "description": "Exhaustive technical overview of what is covered.",
+              "content": "Deep technical abstract of the concept."
             }
-          }
-        ],
-        tool_choice: { type: "function", function: { name: "generate_roadmap" } }
-      }),
-    });
+          ]
+        }
+      ]
+    }`;
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    const userPrompt = `Create an extremely vast, market-leading learning roadmap for: ${skillName}
+    Strategic Context: This is for a professional aiming to become a top-tier ${dreamJob}.
+    Requirement: Cover both major and minor technical pillars. Leave no skill gap unaddressed.`;
+
+    try {
+      const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+      if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY is not configured");
+
+      console.log(`Calling Groq (llama-3.3-70b) for roadmap: ${skillName}`);
+
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          response_format: { type: "json_object" }
+        }),
+      });
+
+      if (!response.ok) {
+        const errorMsg = await response.text();
+        console.error("Groq API Error:", errorMsg);
+        throw new Error(`Groq API Error: ${response.status}`);
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error("Failed to generate roadmap");
+
+      const data = await response.json();
+      const text = data.choices[0].message.content;
+      if (!text) throw new Error("No response text from Groq");
+
+      return new Response(text, {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
+    } catch (apiError: any) {
+      console.error("Error via API:", apiError);
+      return new Response(JSON.stringify({ 
+        error: "Groq Roadmap Generation Failed", 
+        details: apiError.message 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
-    if (!toolCall) {
-      throw new Error("No tool call response received");
-    }
-
-    const roadmap = JSON.parse(toolCall.function.arguments);
-
-    return new Response(JSON.stringify(roadmap), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("Error generating roadmap:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+  } catch (error: any) {
+    console.error("Critical server error:", error);
+    return new Response(JSON.stringify({ 
+      error: "Internal Server Error", 
+      message: error instanceof Error ? error.message : "Unknown error" 
+    }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

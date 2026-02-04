@@ -110,17 +110,22 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     setIsSubmitting(true);
     
     try {
-      // Update profile
+      // Update profile using upsert to handle case where profile might not exist
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({
+        .upsert({
+          user_id: user.id,
           full_name: fullName,
           dream_job: dreamJob,
           onboarding_completed: true,
-        })
-        .eq("user_id", user.id);
+        }, {
+          onConflict: 'user_id'
+        });
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error("Profile save error details:", profileError);
+        throw profileError;
+      }
 
       // Insert user skills
       const allUserSkills = [...new Set([...selectedSkills, ...resumeSkills])];
@@ -131,11 +136,17 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           skill_name: skill,
         }));
 
+        // Using upsert to prevent errors on duplicate skills
         const { error: skillsError } = await supabase
           .from("user_skills")
-          .insert(skillsToInsert);
+          .upsert(skillsToInsert, {
+            onConflict: 'user_id,skill_name'
+          });
 
-        if (skillsError) throw skillsError;
+        if (skillsError) {
+          console.error("Skills save error details:", skillsError);
+          throw skillsError;
+        }
       }
 
       toast({

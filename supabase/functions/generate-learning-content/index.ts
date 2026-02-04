@@ -11,74 +11,73 @@ serve(async (req) => {
   }
 
   try {
-    const { topicTitle, subtopicTitle, skillName, dreamJob } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const { subtopicTitle, skillName, section } = await req.json();
+
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+    if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY is not configured");
+
+    const model = "llama-3.1-8b-instant";
+
+    // Mode 1: Initial Skeleton & First Section Data
+    if (!section) {
+      const systemPrompt = `You are an expert technical documentation designer. Provide 4 granular sub-topic titles and a RICH technical deep-dive for the first title.
+      
+      FORMATTING RULES:
+      1. Use double line breaks between paragraphs for clarity.
+      2. **Bold** every important technical keyword or concept.
+      3. Use \`code\` tags for variables, methods, or small snippets.
+      4. Use professional Markdown headings and bullet points.
+      
+      Respond STRICTLY in JSON:
+      {
+        "sections": ["Title 1", "Title 2", "Title 3", "Title 4"],
+        "firstSectionContent": "Richly formatted Markdown content here..."
+      }`;
+
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model: model,
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: `Skill: ${skillName} | Topic: ${subtopicTitle}` }],
+          response_format: { type: "json_object" }
+        }),
+      });
+
+      const data = await response.json();
+      const content = data.choices[0].message.content;
+      return new Response(content, { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const systemPrompt = `You are an expert educator creating comprehensive learning content. Generate detailed, engaging educational content that includes:
+    // Mode 2: Targeted Fetch for specific section
+    const systemPrompt = `You are a master technical tutor. Provide a RICH technical deep-dive for the section.
+    
+    FORMATTING RULES:
+    1. **Bold** all key technical terms.
+    2. Use double line breaks between sections.
+    3. Include practical examples with \`inline code\` or blocks.
+    4. NO intro or greeting.`;
 
-1. Clear explanations with examples
-2. Key concepts and definitions
-3. Practical exercises or code examples where relevant
-4. Best practices and common pitfalls
-5. Summary and key takeaways
-6. Quiz questions to test understanding
-
-Format the content in Markdown with proper headings, code blocks, and lists. Make it engaging and practical.`;
-
-    const userPrompt = `Create comprehensive learning content for:
-Skill: ${skillName}
-Topic: ${topicTitle}
-Subtopic: ${subtopicTitle}
-Target Career: ${dreamJob}
-
-Make the content practical and job-ready focused. Include real-world examples and exercises.`;
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_API_KEY}` },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: model,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
+          { role: "user", content: `Skill: ${skillName} | Lesson: ${subtopicTitle} | Section: ${section}` }
+        ]
       }),
     });
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error("Failed to generate content");
-    }
-
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    return new Response(JSON.stringify({ content }), {
+    return new Response(JSON.stringify({ content: data.choices[0].message.content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error) {
-    console.error("Error generating content:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+
+  } catch (error: any) {
+    console.error("ERROR:", error.message);
+    return new Response(JSON.stringify({ error: "Failed", message: error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

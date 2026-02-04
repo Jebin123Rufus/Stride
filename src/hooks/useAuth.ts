@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -29,10 +28,33 @@ export function useAuth() {
   }, []);
 
   const signInWithGoogle = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
     });
-    return result;
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  };
+
+  const signInWithEmail = async (email: string) => {
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
   };
 
   const signOut = async () => {
@@ -44,6 +66,7 @@ export function useAuth() {
     session,
     loading,
     signInWithGoogle,
+    signInWithEmail,
     signOut,
   };
 }
