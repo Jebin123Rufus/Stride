@@ -86,9 +86,20 @@ serve(async (req) => {
 
 
       const data = await response.json();
-      return new Response(data.choices[0].message.content, {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const content = data.choices[0].message.content;
+      
+      console.log(`Successfully generated quiz for: ${subtopicTitle}`);
+      
+      // Ensure we return the parsed object, not a nested string
+      try {
+        const parsedQuiz = JSON.parse(content);
+        return new Response(JSON.stringify(parsedQuiz), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (parseError) {
+        console.error("Failed to parse AI JSON:", content);
+        throw new Error("AI returned invalid JSON format");
+      }
     }
 
     // Mode 2: Targeted Fetch for specific section

@@ -266,6 +266,8 @@ export function LearningModule({
       });
 
       if (error) throw error;
+      console.log("📥 Stride AI: Quiz Response Data:", data);
+
       if (data) {
         if (data.isError) {
           throw new Error(data.message || data.error || "Quiz generation failed");
@@ -274,6 +276,7 @@ export function LearningModule({
           setQuizQuestions(data.questions);
           setUserAnswers(new Array(data.questions.length).fill(-1));
         } else {
+          console.error("❌ Stride AI: Invalid quiz format. Questions missing or empty in:", data);
           throw new Error("No questions were generated. Please try again.");
         }
       }
