@@ -110,11 +110,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     setIsSubmitting(true);
     
     try {
-<<<<<<< HEAD
-      // Update profile using upsert to handle case where profile might not exist
-=======
       // Upsert profile (create if doesn't exist, update if it does)
->>>>>>> a10c8d5e7d00a416b10e9a0dfd29d993e09321e5
       const { error: profileError } = await supabase
         .from("profiles")
         .upsert({
@@ -144,12 +140,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         const { error: skillsError } = await supabase
           .from("user_skills")
           .upsert(skillsToInsert, {
-<<<<<<< HEAD
-            onConflict: 'user_id,skill_name'
-=======
             onConflict: 'user_id,skill_name',
             ignoreDuplicates: true
->>>>>>> a10c8d5e7d00a416b10e9a0dfd29d993e09321e5
           });
 
         if (skillsError) {
