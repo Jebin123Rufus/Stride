@@ -106,13 +106,44 @@ export function LearningModule({
   }, [subtopic.id]);
 
   const generateContent = async () => {
+    if (!user || !roadmap.id) return;
+    
     setIsLoading(true);
-    console.log("🚀 Stride AI: Requesting content for:", subtopic.title);
+    console.log("🚀 Stride AI: Loading content for:", subtopic.title);
+    
+    // Reset state first
     setSections([]);
     setCurrentSection(null);
     setSectionContent({});
-    
+
     try {
+      // 1. Try to fetch existing content from database
+      const { data: progressData } = await supabase
+        .from("topic_progress")
+        .select("notes")
+        .eq("user_id", user.id)
+        .eq("roadmap_id", roadmap.id)
+        .eq("topic_id", topic.id)
+        .eq("subtopic_id", subtopic.id)
+        .maybeSingle();
+
+      if (progressData?.notes) {
+        try {
+          const cached = JSON.parse(progressData.notes);
+          if (cached.sections && cached.sections.length > 0) {
+            console.log("📦 Stride AI: Loaded content from cache");
+            setSections(cached.sections);
+            setSectionContent(cached.content || {});
+            if (cached.sections[0]) setCurrentSection(cached.sections[0]);
+            setIsLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.error("Cache parse error:", e);
+        }
+      }
+
+      // 2. Generate new content if not cached
       const { data, error } = await supabase.functions.invoke("generate-learning-content", {
         body: {
           skillName,
@@ -121,25 +152,29 @@ export function LearningModule({
       });
 
       if (error) throw error;
-
-      console.log("📥 Stride AI: Received Data:", data);
-
       if (data && data.isError) {
         throw new Error(data.message || data.error || "Generation failed");
       }
 
       if (data && data.sections) {
-        setSections(data.sections || []);
+        const newSections = data.sections || [];
+        const newContent = data.firstSectionContent ? { [newSections[0]]: data.firstSectionContent } : {};
         
-        const firstSection = data.sections?.[0];
-        if (firstSection) {
-          setCurrentSection(firstSection);
-          if (data.firstSectionContent) {
-            setSectionContent({ [firstSection]: data.firstSectionContent });
-          }
-        }
-      } else {
-        throw new Error("Invalid data format received - 'sections' missing");
+        setSections(newSections);
+        setSectionContent(newContent);
+        if (newSections[0]) setCurrentSection(newSections[0]);
+
+        // Save to cache
+        await supabase
+          .from("topic_progress")
+          .upsert({
+            user_id: user.id,
+            roadmap_id: roadmap.id,
+            topic_id: topic.id,
+            subtopic_id: subtopic.id,
+            notes: JSON.stringify({ sections: newSections, content: newContent }),
+            updated_at: new Date().toISOString(),
+          });
       }
     } catch (e: any) {
       console.error("❌ Stride AI: Generation error:", e);
@@ -176,7 +211,23 @@ export function LearningModule({
         if (data.isError) {
           throw new Error(data.message || data.error || "Failed to load section");
         }
-        setSectionContent(prev => ({ ...prev, [section]: data.content }));
+        
+        const updatedContent = { ...sectionContent, [section]: data.content };
+        setSectionContent(updatedContent);
+
+        // Update cache
+        if (user && roadmap.id) {
+          await supabase
+            .from("topic_progress")
+            .upsert({
+              user_id: user.id,
+              roadmap_id: roadmap.id,
+              topic_id: topic.id,
+              subtopic_id: subtopic.id,
+              notes: JSON.stringify({ sections, content: updatedContent }),
+              updated_at: new Date().toISOString(),
+            });
+        }
       }
     } catch (e: any) {
       console.error("Section fetch error:", e);
@@ -219,9 +270,11 @@ export function LearningModule({
         if (data.isError) {
           throw new Error(data.message || data.error || "Quiz generation failed");
         }
-        if (data.questions) {
+        if (data.questions && data.questions.length > 0) {
           setQuizQuestions(data.questions);
           setUserAnswers(new Array(data.questions.length).fill(-1));
+        } else {
+          throw new Error("No questions were generated. Please try again.");
         }
       }
     } catch (e: any) {
@@ -297,6 +350,7 @@ export function LearningModule({
           is_completed: true,
           completion_percentage: 100,
           completed_at: new Date().toISOString(),
+          notes: JSON.stringify({ sections, content: sectionContent }),
         });
 
       if (error) throw error;
@@ -464,35 +518,35 @@ export function LearningModule({
                             </div>
                           ))}
 
-                          {!quizSubmitted ? (
+                          {quizQuestions.length > 0 && !quizSubmitted ? (
                             <div className="pt-8 flex justify-center">
                               <Button size="xl" className="rounded-full px-12" onClick={submitQuiz}>
                                 Submit Quiz
                               </Button>
                             </div>
-                          ) : (
+                          ) : quizQuestions.length > 0 ? (
                             <div className="pt-8 space-y-6 flex flex-col items-center border-t border-border mt-12">
                               <div className="text-center">
-                                <h3 className="text-3xl font-bold mb-2">Final Score: {quizScore}/10</h3>
+                                <h3 className="text-3xl font-bold mb-2">Final Score: {quizScore}/{quizQuestions.length}</h3>
                                 <p className="text-muted-foreground">
-                                  {quizScore >= 6 
+                                  {quizScore >= Math.ceil(quizQuestions.length * 0.6) 
                                     ? "Congratulations! You've mastered this module." 
                                     : "Not quite there yet. Review the content and try again."}
                                 </p>
                               </div>
                               <div className="flex gap-4">
-                                {quizScore < 6 && (
+                                {quizScore < Math.ceil(quizQuestions.length * 0.6) && (
                                   <Button variant="outline" size="lg" className="rounded-full px-8" onClick={startQuiz}>
                                     <RotateCcw className="w-4 h-4 mr-2" />
                                     Try Again
                                   </Button>
                                 )}
                                 <Button size="lg" className="rounded-full px-8" onClick={() => setShowQuiz(false)}>
-                                  {quizScore >= 6 ? "Back to Lesson" : "Review Content"}
+                                  {quizScore >= Math.ceil(quizQuestions.length * 0.6) ? "Back to Lesson" : "Review Content"}
                                 </Button>
                               </div>
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       )}
                     </div>
