@@ -49,6 +49,46 @@ serve(async (req) => {
       return new Response(content, { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Mode 3: Quiz Generation
+    if (section === "quiz") {
+      const systemPrompt = `You are a technical examiner. Create a 10-question multiple-choice quiz about the given topic.
+      Each question must have:
+      1. A clear question text.
+      2. 4 distinct options.
+      3. Exactly 1 correct answer (as index 0-3).
+      4. A brief explanation for the correct answer.
+
+      Respond STRICTLY in JSON format:
+      {
+        "questions": [
+          {
+            "question": "Question text?",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correctAnswer": 0,
+            "explanation": "Explanation here..."
+          }
+        ]
+      }`;
+
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Generate a 10-question quiz for - Skill: ${skillName} | Lesson: ${subtopicTitle}` }
+          ],
+          response_format: { type: "json_object" }
+        }),
+      });
+
+      const data = await response.json();
+      return new Response(data.choices[0].message.content, {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Mode 2: Targeted Fetch for specific section
     const systemPrompt = `You are a master technical tutor. Provide a RICH technical deep-dive for the section.
     
@@ -74,11 +114,14 @@ serve(async (req) => {
     return new Response(JSON.stringify({ content: data.choices[0].message.content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
   } catch (error: any) {
     console.error("ERROR:", error.message);
-    return new Response(JSON.stringify({ error: "Failed", message: error.message }), {
-      status: 500,
+    return new Response(JSON.stringify({ 
+      error: "Failed", 
+      message: error.message,
+      isError: true 
+    }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

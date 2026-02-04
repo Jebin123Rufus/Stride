@@ -62,6 +62,13 @@ interface LearningModuleProps {
   onNavigate: (subtopic: Subtopic) => void;
 }
 
+interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation: string;
+}
+
 export function LearningModule({
   skillName,
   topic,
@@ -78,6 +85,12 @@ export function LearningModule({
   const [isLoading, setIsLoading] = useState(true);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [userAnswers, setUserAnswers] = useState<number[]>([]);
+  const [isQuizLoading, setIsQuizLoading] = useState(false);
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizScore, setQuizScore] = useState(0);
   
   const { user, signOut } = useAuthContext();
   const { toast } = useToast();
@@ -110,6 +123,10 @@ export function LearningModule({
       if (error) throw error;
 
       console.log("📥 Stride AI: Received Data:", data);
+
+      if (data && data.isError) {
+        throw new Error(data.message || data.error || "Generation failed");
+      }
 
       if (data && data.sections) {
         setSections(data.sections || []);
@@ -156,6 +173,9 @@ export function LearningModule({
 
       if (error) throw error;
       if (data) {
+        if (data.isError) {
+          throw new Error(data.message || data.error || "Failed to load section");
+        }
         setSectionContent(prev => ({ ...prev, [section]: data.content }));
       }
     } catch (e: any) {
@@ -180,12 +200,93 @@ export function LearningModule({
     setIsCompleted(data?.is_completed || false);
   };
 
+  const startQuiz = async () => {
+    setIsQuizLoading(true);
+    setShowQuiz(true);
+    setQuizSubmitted(false);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-learning-content", {
+        body: {
+          skillName,
+          subtopicTitle: subtopic.title,
+          section: "quiz",
+        },
+      });
+
+      if (error) throw error;
+      if (data) {
+        if (data.isError) {
+          throw new Error(data.message || data.error || "Quiz generation failed");
+        }
+        if (data.questions) {
+          setQuizQuestions(data.questions);
+          setUserAnswers(new Array(data.questions.length).fill(-1));
+        }
+      }
+    } catch (e: any) {
+      console.error("Quiz generation error:", e);
+      toast({
+        title: "Quiz Generation Failed",
+        description: "Could not load the quiz. Please try again.",
+        variant: "destructive"
+      });
+      setShowQuiz(false);
+    } finally {
+      setIsQuizLoading(false);
+    }
+  };
+
+  const handleAnswerSelect = (questionIndex: number, answerIndex: number) => {
+    if (quizSubmitted) return;
+    const newAnswers = [...userAnswers];
+    newAnswers[questionIndex] = answerIndex;
+    setUserAnswers(newAnswers);
+  };
+
+  const submitQuiz = async () => {
+    if (userAnswers.includes(-1)) {
+      toast({
+        title: "Incomplete Quiz",
+        description: "Please answer all questions before submitting.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    let score = 0;
+    userAnswers.forEach((answer, index) => {
+      if (answer === quizQuestions[index].correctAnswer) {
+        score++;
+      }
+    });
+
+    setQuizScore(score);
+    setQuizSubmitted(true);
+
+    const passScore = Math.ceil(quizQuestions.length * 0.6); // 60% to pass
+
+    if (score >= passScore) {
+      await markAsComplete();
+    } else {
+      toast({
+        title: "Quiz Not Passed",
+        description: `You scored ${score}/${quizQuestions.length}. You need at least ${passScore}/${quizQuestions.length} to pass. Try again!`,
+        variant: "destructive"
+      });
+    }
+  };
+
+
   const markAsComplete = async () => {
     if (!user || !roadmap.id) return;
 
     setIsMarkingComplete(true);
 
     try {
+      // Get all subtopics in this roadmap to check overall progress
+      const allSubtopics = roadmap.topics.flatMap(t => t.subtopics.map(s => s.id));
+      
       const { error } = await supabase
         .from("topic_progress")
         .upsert({
@@ -202,8 +303,8 @@ export function LearningModule({
 
       setIsCompleted(true);
       toast({
-        title: "Module completed!",
-        description: "Great job! Keep up the learning momentum.",
+        title: "Module mastered!",
+        description: "Great job! You passed the quiz and completed this module.",
       });
     } catch (error) {
       console.error("Error marking complete:", error);
@@ -292,6 +393,109 @@ export function LearningModule({
                       <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
                       <p className="text-muted-foreground mt-4 text-sm animate-pulse">Syncing concepts...</p>
                     </div>
+                  ) : showQuiz ? (
+                    <div className="space-y-8 py-4">
+                      <div className="flex items-center justify-between mb-8">
+                        <div>
+                          <h2 className="text-2xl font-bold flex items-center gap-2">
+                             <Sparkles className="w-6 h-6 text-primary" />
+                             Module Mastery Quiz
+                          </h2>
+                          <p className="text-muted-foreground">Answer 10 questions to prove your mastery (6/10 required)</p>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => setShowQuiz(false)}>
+                          Cancel
+                        </Button>
+                      </div>
+
+                      {isQuizLoading ? (
+                        <div className="flex flex-col items-center justify-center py-24">
+                          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                          <p className="text-muted-foreground mt-4">Generating your unique quiz...</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-12">
+                          {quizQuestions.map((q, qIdx) => (
+                            <div key={qIdx} className="space-y-4">
+                              <div className="flex gap-4">
+                                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
+                                  {qIdx + 1}
+                                </span>
+                                <h3 className="text-lg font-medium pt-1">{q.question}</h3>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 ml-12">
+                                {q.options.map((opt, oIdx) => {
+                                  let variant: "outline" | "default" | "secondary" = "outline";
+                                  const isSelected = userAnswers[qIdx] === oIdx;
+                                  
+                                  if (quizSubmitted) {
+                                    if (oIdx === q.correctAnswer) variant = "default";
+                                    else if (isSelected) variant = "secondary";
+                                  } else if (isSelected) {
+                                    variant = "default";
+                                  }
+
+                                  return (
+                                    <Button
+                                      key={oIdx}
+                                      variant={variant}
+                                      className={`justify-start h-auto py-3 px-4 text-left whitespace-normal border-2 ${
+                                        quizSubmitted && isSelected && oIdx !== q.correctAnswer ? "border-destructive bg-destructive/10" : 
+                                        quizSubmitted && oIdx === q.correctAnswer ? "border-success bg-success/10 text-success-foreground" :
+                                        isSelected ? "border-primary" : "border-border/50"
+                                      }`}
+                                      onClick={() => handleAnswerSelect(qIdx, oIdx)}
+                                      disabled={quizSubmitted}
+                                    >
+                                      <span className="mr-3 opacity-50">{String.fromCharCode(65 + oIdx)}.</span>
+                                      {opt}
+                                    </Button>
+                                  );
+                                })}
+                              </div>
+                              {quizSubmitted && (
+                                <div className={`ml-12 p-4 rounded-xl text-sm ${
+                                  userAnswers[qIdx] === q.correctAnswer ? "bg-success/5 text-success border border-success/20" : "bg-destructive/5 text-destructive border border-destructive/20"
+                                }`}>
+                                  <p className="font-bold mb-1">{userAnswers[qIdx] === q.correctAnswer ? "Correct!" : "Incorrect."}</p>
+                                  <p className="opacity-90">{q.explanation}</p>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                          {!quizSubmitted ? (
+                            <div className="pt-8 flex justify-center">
+                              <Button size="xl" className="rounded-full px-12" onClick={submitQuiz}>
+                                Submit Quiz
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="pt-8 space-y-6 flex flex-col items-center border-t border-border mt-12">
+                              <div className="text-center">
+                                <h3 className="text-3xl font-bold mb-2">Final Score: {quizScore}/10</h3>
+                                <p className="text-muted-foreground">
+                                  {quizScore >= 6 
+                                    ? "Congratulations! You've mastered this module." 
+                                    : "Not quite there yet. Review the content and try again."}
+                                </p>
+                              </div>
+                              <div className="flex gap-4">
+                                {quizScore < 6 && (
+                                  <Button variant="outline" size="lg" className="rounded-full px-8" onClick={startQuiz}>
+                                    <RotateCcw className="w-4 h-4 mr-2" />
+                                    Try Again
+                                  </Button>
+                                )}
+                                <Button size="lg" className="rounded-full px-8" onClick={() => setShowQuiz(false)}>
+                                  {quizScore >= 6 ? "Back to Lesson" : "Review Content"}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="space-y-6">
                       <div className="flex flex-wrap gap-2 text-primary font-semibold text-sm mb-2">
@@ -341,6 +545,7 @@ export function LearningModule({
                     </div>
                   )}
                 </div>
+
               </div>
             </div>
 
@@ -361,8 +566,8 @@ export function LearningModule({
                 className={`rounded-full px-10 transition-all duration-300 shadow-lg ${
                   isCompleted ? "bg-success hover:bg-success/90" : "bg-primary hover:scale-105"
                 }`}
-                onClick={markAsComplete}
-                disabled={isCompleted || isMarkingComplete}
+                onClick={isCompleted ? undefined : startQuiz}
+                disabled={isCompleted || isMarkingComplete || showQuiz}
               >
                 {isMarkingComplete ? (
                   <Loader2 className="w-5 h-5 animate-spin mr-2" />

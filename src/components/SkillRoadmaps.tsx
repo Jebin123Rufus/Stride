@@ -73,6 +73,7 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
   const [expandedSkill, setExpandedSkill] = useState<string | null>(null);
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<Map<string, number>>(new Map());
+  const [completedSubtopics, setCompletedSubtopics] = useState<Set<string>>(new Set());
   const [profile, setProfile] = useState<any>(null);
   
   const { user, signOut } = useAuthContext();
@@ -118,6 +119,22 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
     }
   };
 
+  useEffect(() => {
+    if (roadmaps.size > 0) {
+      const progressMap = new Map<string, number>();
+      
+      roadmaps.forEach((roadmap, skillName) => {
+        const total = roadmap.topics.reduce((acc, t) => acc + t.subtopics.length, 0);
+        const completed = roadmap.topics.reduce((acc, t) => 
+          acc + t.subtopics.filter(s => completedSubtopics.has(s.id)).length, 0
+        );
+        progressMap.set(skillName, total > 0 ? Math.round((completed / total) * 100) : 0);
+      });
+
+      setProgress(progressMap);
+    }
+  }, [roadmaps, completedSubtopics]);
+
   const fetchProgress = async () => {
     if (!user) return;
 
@@ -127,25 +144,11 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
       .eq("user_id", user.id);
 
     if (data) {
-      // Calculate progress per skill
-      const progressMap = new Map<string, number>();
-      const skillSubtopics = new Map<string, { total: number; completed: number }>();
-
+      const completedIds = new Set<string>();
       data.forEach((p: any) => {
-        const skillName = p.skill_roadmaps.skill_name;
-        if (!skillSubtopics.has(skillName)) {
-          skillSubtopics.set(skillName, { total: 0, completed: 0 });
-        }
-        const current = skillSubtopics.get(skillName)!;
-        current.total++;
-        if (p.is_completed) current.completed++;
+        if (p.is_completed) completedIds.add(p.subtopic_id);
       });
-
-      skillSubtopics.forEach((value, key) => {
-        progressMap.set(key, Math.round((value.completed / value.total) * 100));
-      });
-
-      setProgress(progressMap);
+      setCompletedSubtopics(completedIds);
     }
   };
 
@@ -165,6 +168,9 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
       if (response.error) throw response.error;
 
       const roadmapData = response.data;
+      if (roadmapData.isError) {
+        throw new Error(roadmapData.details || roadmapData.error || "Generation failed");
+      }
 
       // Save to database
       const { data: savedRoadmap, error } = await supabase
@@ -195,6 +201,9 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
       });
     } catch (error: any) {
       console.error("Error generating roadmap:", error);
+      if (error.context) {
+        console.error("Error context:", error.context);
+      }
       toast({
         title: "Error generating roadmap",
         description: error.message || "Please try again later.",
@@ -374,23 +383,37 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
 
                               {expandedTopics.has(topic.id) && (
                                 <div className="border-t border-border bg-muted/20 p-2 space-y-1">
-                                  {topic.subtopics.map((subtopic) => (
-                                    <div
-                                      key={subtopic.id}
-                                      className="flex items-center justify-between p-2 rounded hover:bg-background cursor-pointer transition-colors"
-                                      onClick={() =>
-                                        onOpenLearning(skill.name, topic, subtopic, roadmap)
-                                      }
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <Circle className="w-3 h-3 text-muted-foreground" />
-                                        <span className="text-sm">{subtopic.title}</span>
+                                  {topic.subtopics.map((subtopic) => {
+                                    const isSubtopicCompleted = completedSubtopics.has(subtopic.id);
+                                    return (
+                                      <div
+                                        key={subtopic.id}
+                                        className="flex items-center justify-between p-2 rounded hover:bg-background cursor-pointer transition-colors"
+                                        onClick={() =>
+                                          onOpenLearning(skill.name, topic, subtopic, roadmap)
+                                        }
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          {!isSubtopicCompleted && <Circle className="w-3 h-3 text-muted-foreground" />}
+                                          <span className={`text-sm ${isSubtopicCompleted ? "text-foreground font-medium" : ""}`}>
+                                            {subtopic.title}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          {isSubtopicCompleted && (
+                                            <div className="flex items-center gap-2">
+                                              <Badge variant="secondary" className="bg-success/10 text-success border-none text-[10px] h-5">
+                                                Mastered
+                                              </Badge>
+                                              <Check className="w-4 h-4 text-success" />
+                                            </div>
+                                          )}
+                                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                        </div>
+
                                       </div>
-                                      <div className="flex items-center gap-2">
-                                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                                      </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
