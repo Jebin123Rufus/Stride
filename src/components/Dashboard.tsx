@@ -22,6 +22,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface Skill {
   name: string;
@@ -352,6 +353,10 @@ export function Dashboard({ onSelectPath }: DashboardProps) {
                 <X className="w-4 h-4" />
                 <span className="hidden sm:inline">Wipe Data</span>
               </Button>
+
+              <div className="h-4 w-[1px] bg-border mx-1" />
+
+              <ThemeToggle />
 
               <div className="h-4 w-[1px] bg-border mx-1" />
 

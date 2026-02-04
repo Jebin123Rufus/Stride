@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Target, Rocket, ArrowRight } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function LandingPage() {
   const { signInWithGoogle, loading } = useAuthContext();
@@ -24,10 +25,11 @@ export function LandingPage() {
         <nav className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <img src="/logo.png" alt="Stride Logo" className="h-40 md:h-64 w-auto object-contain" />
-            <span className="text-6xl md:text-8xl font-black italic tracking-tighter text-primary drop-shadow-lg leading-none">
-              STRIDE
-            </span>
-          </div>
+              <span className="text-6xl md:text-8xl font-black italic tracking-tighter text-primary drop-shadow-lg leading-none">
+                STRIDE
+              </span>
+            </div>
+            <ThemeToggle />
         </nav>
       </header>
 

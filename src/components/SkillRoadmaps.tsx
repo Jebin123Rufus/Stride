@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface Skill {
   name: string;
@@ -262,12 +263,15 @@ export function SkillRoadmaps({ selectedPath, onBack, onOpenLearning }: SkillRoa
               </div>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={signOut}>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <Button variant="ghost" size="sm" onClick={signOut}>
             <LogOut className="w-4 h-4 mr-2" />
             Sign Out
           </Button>
         </div>
-      </header>
+      </div>
+    </header>
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">

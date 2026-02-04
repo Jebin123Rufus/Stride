@@ -24,6 +24,7 @@ import { allSkills, skillCategories } from "@/data/skills";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -184,7 +185,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <div className="fixed top-6 right-6 z-50">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-2xl">
         {/* Progress bar */}
         <div className="mb-8">

@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface Subtopic {
   id: string;
@@ -415,10 +416,13 @@ export function LearningModule({
                 </div>
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={signOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
+            <div className="flex items-center gap-4">
+              <ThemeToggle />
+              <Button variant="ghost" size="sm" onClick={signOut}>
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
           </div>
           <div className="mt-4">
             <div className="flex items-center justify-between text-sm mb-2">

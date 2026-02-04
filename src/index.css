@@ -69,6 +69,7 @@
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 10px 40px rgba(0, 0, 0, 0.08);
 
     /* Sidebar */
+    /* Sidebar */
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5% 26%;
     --sidebar-primary: 240 6% 10%;
@@ -77,6 +78,7 @@
     --sidebar-accent-foreground: 240 6% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 239 84% 67%;
+    --bg-grid-color: 220 13% 91% / 0.5;
   }
 
   .dark {
@@ -122,6 +124,8 @@
     --sidebar-accent-foreground: 240 5% 96%;
     --sidebar-border: 240 4% 16%;
     --sidebar-ring: 239 84% 67%;
+    --bg-grid-color: 217 33% 17% / 0.5;
+    --gradient-glass: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.7) 100%);
   }
 }
 
@@ -226,8 +230,8 @@
   /* Background patterns */
   .bg-grid-pattern {
     background-image: 
-      linear-gradient(to right, hsl(220 13% 91% / 0.5) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(220 13% 91% / 0.5) 1px, transparent 1px);
+      linear-gradient(to right, hsl(var(--bg-grid-color)) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--bg-grid-color)) 1px, transparent 1px);
     background-size: 40px 40px;
   }
 
