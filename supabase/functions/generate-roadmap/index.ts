@@ -47,6 +47,39 @@ The roadmap should include 4-6 main topics, each with 3-5 subtopics. Make it com
 
 IMPORTANT: Each subtopic's content should be very detailed (500-800 words minimum) with thorough explanations, multiple code examples, and practical exercises. Do NOT include any time estimates or duration information.`;
 
+    const jsonSchema = {
+      type: "object",
+      properties: {
+        skillName: { type: "string" },
+        topics: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              title: { type: "string" },
+              description: { type: "string" },
+              subtopics: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    title: { type: "string" },
+                    description: { type: "string" },
+                    content: { type: "string" }
+                  },
+                  required: ["id", "title", "description", "content"]
+                }
+              }
+            },
+            required: ["id", "title", "description", "subtopics"]
+          }
+        }
+      },
+      required: ["skillName", "topics"]
+    };
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -54,53 +87,19 @@ IMPORTANT: Each subtopic's content should be very detailed (500-800 words minimu
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "generate_roadmap",
-              description: "Generate a skill learning roadmap",
-              parameters: {
-                type: "object",
-                properties: {
-                  skillName: { type: "string" },
-                  topics: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        id: { type: "string" },
-                        title: { type: "string" },
-                        description: { type: "string" },
-                        subtopics: {
-                          type: "array",
-                          items: {
-                            type: "object",
-                            properties: {
-                              id: { type: "string" },
-                              title: { type: "string" },
-                              description: { type: "string" },
-                              content: { type: "string" }
-                            },
-                            required: ["id", "title", "description", "content"]
-                          }
-                        }
-                      },
-                      required: ["id", "title", "description", "subtopics"]
-                    }
-                  }
-                },
-                required: ["skillName", "topics"]
-              }
-            }
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "roadmap_response",
+            schema: jsonSchema,
+            strict: true
           }
-        ],
-        tool_choice: { type: "function", function: { name: "generate_roadmap" } }
+        }
       }),
     });
 
@@ -123,13 +122,14 @@ IMPORTANT: Each subtopic's content should be very detailed (500-800 words minimu
     }
 
     const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    const content = data.choices?.[0]?.message?.content;
     
-    if (!toolCall) {
-      throw new Error("No tool call response received");
+    if (!content) {
+      console.error("No content in response:", JSON.stringify(data));
+      throw new Error("No content received from AI");
     }
 
-    const roadmap = JSON.parse(toolCall.function.arguments);
+    const roadmap = JSON.parse(content);
 
     return new Response(JSON.stringify(roadmap), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
